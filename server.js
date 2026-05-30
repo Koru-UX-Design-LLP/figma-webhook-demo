@@ -8,7 +8,19 @@ const FIGMA_PASSCODE = 'figma-demo-secret'
 
 const eventQueue = []
 
-app.post('/figma-webhook', (req, res) => {
+async function getFileName(fileKey) {
+  try {
+    const res = await fetch(`https://api.figma.com/v1/files/${fileKey}?depth=1`, {
+      headers: { 'X-Figma-Token': process.env.FIGMA_TOKEN },
+    })
+    const data = await res.json()
+    return data.name?.replace(/\s+/g, '-') || null
+  } catch {
+    return null
+  }
+}
+
+app.post('/figma-webhook', async (req, res) => {
   console.log('Webhook received:', req.body.event_type, req.body.status)
 
   if (req.body.passcode !== FIGMA_PASSCODE) {
@@ -21,8 +33,11 @@ app.post('/figma-webhook', (req, res) => {
   }
 
   if (req.body.event_type === 'DEV_MODE_STATUS_UPDATE' && req.body.status === 'READY_FOR_DEV') {
-    eventQueue.push(req.body)
-    console.log('Event queued. Queue length:', eventQueue.length)
+    res.status(200).send('ok')
+    const fileName = await getFileName(req.body.file_key)
+    eventQueue.push({ ...req.body, file_name: fileName })
+    console.log('Event queued. File name:', fileName, 'Queue length:', eventQueue.length)
+    return
   }
 
   res.status(200).send('ok')
